@@ -8,8 +8,13 @@ admet_group.zip
 *.joblib
 
 # Output artifacts
-*.png
 *.csv
+
+# PNGs (except root-level results shown in README)
+drug_pred_v1/*.png
+goodGATrun/*.png
+old_GNN/*.png
+tdc_eval/*.png
 
 # Python
 __pycache__/

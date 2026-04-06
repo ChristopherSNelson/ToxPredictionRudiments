@@ -45,6 +45,12 @@ cd tdc_eval
 python drug_tox_eval.py
 ```
 
+## Results
+
+![Actual vs Predicted LD50](actual_vs_predicted.png)
+
+![Learning Curves](learning_curves.png)
+
 ## Best Hyperparameters Found
 
 | Parameter | Value |
