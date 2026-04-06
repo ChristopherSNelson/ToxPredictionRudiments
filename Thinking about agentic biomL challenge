@@ -1,0 +1,312 @@
+Thinking about agentic biomL challenge
+
+https://www.linkedin.com/feed/update/urn:li:activity:7325527280254869506/
+https://livingmachines.substack.com/p/the-agentic-bioml-challenge
+
+
+tried lovable vibe coding for toxicity predictor 
+it skipped the ml and focused on the gui website...
+when prompted it added rdk features and made a linear model.
+the output was in .tsx and .ts  using react for javascript UI coding.
+
+
+using claude.
+it made something with randomforest on rdk features,
+then it suggested graph-NN and I said ok...
+trying to install dependencies and run the script...
+
+I was within the af env...
+ tox_prediction % pip install torch torch-geometric rdkit PyTDC
+ #might have broken pyroe for single cell stuff... pip complaints...
+ pyranges 0.0.120 requires cython, which is not installed.
+pip install Cython
+might've messed up the af conda env...
+
+deactivated all conda envs 
+did the pip install again with regular env
+pip install torch torch-geometric rdkit PyTDC
+
+At the call to predictor.fit()
+I'm getting this error...
+"miniconda3/lib/python3.11/site-packages/torch_geometric/nn/dense/linear.py", line 147, in forward
+    return F.linear(x, self.weight, self.bias)
+RuntimeError: mat1 and mat2 shapes cannot be multiplied (543x38 and 39x64)""
+Upstream is a call to line 106 in forward:
+"x = F.relu(self.conv1(x, edge_index))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^ "
+
+ok clause fixes that and the script runs
+just doing 2 epochs.
+
+tox_prediction % python toxicity-predictor.py
+Loading LD50_Zhu dataset from TDC...
+Found local copy...
+Loading...
+Done!
+Train set: 5170 compounds
+Validation set: 738 compounds
+Test set: 1477 compounds
+
+Verifying molecular structures from first 3 compounds:
+SMILES 1: BrC(Br)Br
+  Valid molecule with 4 atoms, 3 bonds
+  Feature vector length: 36
+SMILES 2: C=CBr
+  Valid molecule with 3 atoms, 2 bonds
+SMILES 3: Brc1ccc(-c2ccc(Br)c(Br)c2Br)c(Br)c1Br
+  Valid molecule with 18 atoms, 19 bonds
+
+Input feature dimensions: torch.Size([242, 36])
+Expected input_dim: 36
+
+Initializing model with input dimension: 36
+Epoch: 001, Train Loss: 1.2254, Valid Loss: 0.9720
+Epoch: 002, Train Loss: 1.0131, Valid Loss: 0.9695
+Test MSE: 0.8545
+Test RMSE: 0.9244
+Test R²: 0.0436
+New compound LD50 prediction: 2.5656 # units are log(1/(mol/kg)) ( big numbers are more toxic, dioxin at 10 units on the training list)
+
+tried 100 epochs.
+The R2 is close to zero for truth vs prediction.
+doesn't seem like much of a fit.
+
+The R2 is close to zero for truth vs prediction.
+Add hyoerparameter tuning.
+Have the script save a csv with the final predictions vs test truth.
+
+hmm, claude crapped out on me.
+
+try again starting from scratch...
+
+prompt:
+Design a system to predict toxicity properties of drugs given a SMILES string. https://tdcommons.ai/benchmark/admet_group/overview/
+Use graph neural networks and hyperparameter tuning.
+Have the script save a csv with the final predictions vs test truth.
+"from tdc.single_pred import Tox
+data = Tox(name = 'LD50_Zhu')
+split = data.get_split() "# returns a dict with train valid and test dataframes. The SMILES are in the "Drug" column.
+
+#gave ne 467 lines. tries two versions of graph networks : gcn and gat(attention)
+
+pip install optuna # hyperparam tuning fanciness
+
+python drug_toxicity_prediction.py
+
+"""
+...
+Trial 12 finished with value: 0.6596162103898957 and parameters: {'model_type': 'GAT', 'hidden_channels': 64, 'num_layers': 3, 'dropout': 0.2, 'lr': 0.0020222672037509717, 'batch_size': 128, 'heads': 8}. Best is trial 12 with value: 0.6596162103898957.
+...
+
+Best trial:
+  Value (RMSE): 0.6596162103898957
+  Params: 
+    model_type: GAT
+    hidden_channels: 64
+    num_layers: 3
+    dropout: 0.2
+    lr: 0.0020222672037509717
+    batch_size: 128
+    heads: 8
+
+Training model with best hyperparameters...
+Epoch: 001, Train Loss: 1.3858, Val RMSE: 0.8785, Val MAE: 0.6910, Val R²: 0.1934
+...
+Epoch: 081, Train Loss: 0.4531, Val RMSE: 0.6697, Val MAE: 0.4910, Val R²: 0.5312
+Epoch: 082, Train Loss: 0.4685, Val RMSE: 0.6953, Val MAE: 0.5292, Val R²: 0.4947
+Early stopping at epoch 82
+
+Test RMSE: 0.6892
+Test MAE: 0.5286
+Test R²: 0.4683
+
+Saved predictions to ld50_predictions.csv
+
+Execution completed successfully!
+"""
+
+ok that's pretty good. that was a one shot prompt and response.
+the fit seems decent. a little biased towards higher predictions
+
+learning
+mean absolute error (MAE) and the root mean squared error (RMSE)
+rmse is more sensitive to outliers.
+r is correl and Rsquared is model goodness. simple univariate linreg theyre the same(?). elsewise no.
+sometimes you want a slope of the fit...
+
+
+anywhoosleby think more models or better fit?... what do we want? big dataset more features?
+
+allegedly mae would beat the leaderboard... but maybe not apples to apples...
+
+i'm curious what scaffold split would get us... supposed to be harder...
+
+in the objective function you could change it to optimize for mae instead of rmse... the contest uses mae
+
+try this submission steps for leaderboard.
+https://tdcommons.ai/benchmark/overview/#step-by-step-instructions
+see what we get
+"""
+from tdc.benchmark_group import admet_group
+group = admet_group(path = 'data/')
+predictions_list = []
+
+for seed in [1, 2, 3, 4, 5]:
+    benchmark = group.get('Caco2_Wang') 
+    # all benchmark names in a benchmark group are stored in group.dataset_names
+    predictions = {}
+    name = benchmark['name']
+    train_val, test = benchmark['train_val'], benchmark['test']
+    train, valid = group.get_train_valid_split(benchmark = name, split_type = 'default', seed = seed)
+    
+        # --------------------------------------------- # 
+        #  Train your model using train, valid, test    #
+        #  Save test prediction in y_pred_test variable #
+        # --------------------------------------------- #
+        
+    predictions[name] = y_pred_test
+    predictions_list.append(predictions)
+
+results = group.evaluate_many(predictions_list)
+# {'caco2_wang': [6.328, 0.101]}
+"""
+
+#######
+def count_parameters(model):
+    """Count the number of trainable parameters in a model."""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    #####
+
+ GAT has more params by 10x. can overfit. needs regularization thru higher dropout...
+ so try a version with just GAT and higher dropout numbers...
+
+#######
+5-7-2025
+python drug_toxicity_prediction_v2.py
+
+pretty weird run - spiked loss at about 60 epochs... made a bad model. weird.
+running it again...
+
+second time worked well:
+
+"""
+...
+Best trial:
+  Value (RMSE): 0.6763496512916154
+  Params: 
+    model_type: GAT
+    hidden_channels: 64
+    num_layers: 3
+    dropout: 0.2
+    lr: 0.0023922148674661
+    batch_size: 64
+    heads: 5
+
+...
+Epoch: 087, Train Loss: 0.4764, Val RMSE: 0.7007, Val MAE: 0.5130, Val R²: 0.4869
+Epoch: 088, Train Loss: 0.4584, Val RMSE: 0.6768, Val MAE: 0.4890, Val R²: 0.5213
+Early stopping at epoch 88
+
+Test RMSE: 0.6581
+Test MAE: 0.4856
+Test R²: 0.5153
+
+Saved predictions to ld50_predictions.csv
+"""
+
+ran again with saving the model enabled...
+
+"""
+...
+Best trial:
+  Value (RMSE): 0.721332002992164
+  Params: 
+    model_type: GAT
+    hidden_channels: 128
+    num_layers: 2
+    dropout: 0.30000000000000004
+    lr: 0.001222557661564056
+    batch_size: 32
+    heads: 2
+
+ ...   
+Epoch: 160, Train Loss: 0.5147, Val RMSE: 0.7198, Val MAE: 0.5218, Val R²: 0.4585
+Epoch: 161, Train Loss: 0.5220, Val RMSE: 0.7213, Val MAE: 0.5175, Val R²: 0.4562
+Early stopping at epoch 161
+
+Test RMSE: 0.6792
+Test MAE: 0.5009
+Test R²: 0.4836
+
+Saved predictions to ld50_predictions.csv
+saving to toxicity_model.pt
+Model saved to toxicity_model.pt
+"""
+
+
+#############
+
+#save and load model:
+def save_model(model, best_params, file_path='toxicity_model.pt'):
+    """Save the trained model and its hyperparameters to disk."""
+    # Create a dictionary containing everything needed to restore the model
+    save_dict = {
+        'model_state_dict': model.state_dict(),
+        'model_type': best_params['model_type'],
+        'hidden_channels': best_params['hidden_channels'],
+        'num_layers': best_params['num_layers'],
+        'dropout': best_params['dropout'],
+        'num_node_features': model.conv_layers[0].in_channels,  # Save input feature dimension
+    }
+    
+    # Add model-specific parameters
+    if best_params['model_type'] == 'GAT':
+        save_dict['heads'] = best_params.get('heads', 4)
+    
+    # Save to disk
+    torch.save(save_dict, file_path)
+    print(f"Model saved to {file_path}")
+
+
+def load_model(file_path='toxicity_model.pt'):
+    """Load a saved model from disk."""
+    # Load the saved dictionary
+    save_dict = torch.load(file_path, map_location=torch.device('cpu'))  # Load to CPU by default
+    
+    # Get model parameters
+    model_type = save_dict['model_type']
+    hidden_channels = save_dict['hidden_channels']
+    num_layers = save_dict['num_layers']
+    dropout = save_dict['dropout']
+    num_node_features = save_dict['num_node_features']
+    
+    # Recreate the model architecture
+    if model_type == 'GCN':
+        model = GCNNet(
+            num_node_features=num_node_features,
+            hidden_channels=hidden_channels,
+            num_layers=num_layers,
+            dropout=dropout
+        )
+    else:  # GAT
+        heads = save_dict.get('heads', 4)  # Default to 4 heads if not specified
+        model = GATNet(
+            num_node_features=num_node_features,
+            hidden_channels=hidden_channels,
+            num_layers=num_layers,
+            heads=heads,
+            dropout=dropout
+        )
+    
+    # Load the saved weights
+    model.load_state_dict(save_dict['model_state_dict'])
+    
+    # Set to evaluation mode
+    model.eval()
+    
+    return model
+
+#####
+
+running the training inside the tdc eval code...
+
