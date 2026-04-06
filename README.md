@@ -6,43 +6,65 @@ Predicts acute oral toxicity (LD50) of drug compounds from SMILES strings using 
 
 - **GAT** (Graph Attention Network) - best results so far (R^2 ~0.52, RMSE ~0.66)
 - **GCN** (Graph Convolutional Network) - simpler baseline
-- **Random Forest** on Morgan fingerprints (`toxicity-predictor.py`) - early experiment
 
 Hyperparameter tuning via [Optuna](https://optuna.org/).
-
-## Project Structure
-
-```
-toxicity-predictor.py          # Random Forest baseline (Morgan fingerprints + descriptors)
-drug_toxicity_prediction_v3.py # Main GNN script (GAT/GCN with Optuna tuning)
-tdc_eval/                      # TDC benchmark evaluation
-  drug_tox_eval.py
-drug_pred_v1/                  # Earlier GNN iteration
-goodGATrun/                    # Best GAT configuration (v2)
-old_GNN/                       # Initial GNN attempt
-```
 
 ## Setup
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Data is automatically downloaded from TDC on first run.
 
-## Usage
+## CLI Usage
 
-Train with hyperparameter tuning:
+### Train a model
 
 ```bash
-python drug_toxicity_prediction_v3.py
+tox-train
+tox-train --n-trials 50 --output-dir runs/experiment1
+tox-train --device cuda --max-epochs 300 --patience 20
 ```
 
-Run TDC benchmark evaluation:
+### Predict on new compounds
 
 ```bash
-cd tdc_eval
-python drug_tox_eval.py
+tox-predict --model-path toxicity_model.pt --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" "C1=CC=CC=C1"
+tox-predict --model-path toxicity_model.pt --input-file compounds.csv --smiles-col SMILES --output-file results.csv
+```
+
+### Run TDC benchmark
+
+```bash
+tox-evaluate
+tox-evaluate --seeds 1 2 3 4 5 --n-trials 30
+```
+
+## Project Structure
+
+```
+tox_prediction/                    # Installable Python package
+  features.py                      # SMILES to graph conversion (56-dim node features)
+  models.py                        # GCNNet, GATNet, save/load
+  data.py                          # TDC data loading, DataLoader creation
+  training.py                      # Training loop, Optuna HPO
+  predict.py                       # Inference on new SMILES
+  evaluate_tdc.py                  # TDC ADMET benchmark runner
+  plotting.py                      # Learning curves, actual-vs-predicted scatter
+  cli/                             # CLI entrypoints
+    train_cmd.py                   # tox-train
+    predict_cmd.py                 # tox-predict
+    evaluate_cmd.py                # tox-evaluate
+pyproject.toml                     # Package config
+
+# Legacy scripts (kept for reference)
+drug_toxicity_prediction_v3.py     # Previous main script
+toxicity-predictor.py              # Random Forest baseline
+drug_pred_v1/                      # Earlier GNN iteration
+goodGATrun/                        # Best GAT run (v2)
+old_GNN/                           # Initial GNN attempt
+tdc_eval/                          # Previous TDC eval script
 ```
 
 ## Results

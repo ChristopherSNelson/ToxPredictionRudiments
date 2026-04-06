@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "tox-prediction"
+version = "0.1.0"
+description = "Drug toxicity (LD50) prediction with Graph Neural Networks"
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.0",
+    "torch_geometric>=2.3",
+    "rdkit>=2023.03",
+    "pandas>=1.5",
+    "numpy>=1.24",
+    "scikit-learn>=1.2",
+    "matplotlib>=3.7",
+    "optuna>=3.1",
+    "PyTDC>=0.4",
+    "tqdm>=4.65",
+]
+
+[project.scripts]
+tox-train = "tox_prediction.cli.train_cmd:main"
+tox-predict = "tox_prediction.cli.predict_cmd:main"
+tox-evaluate = "tox_prediction.cli.evaluate_cmd:main"
+
+[tool.setuptools.packages.find]
+include = ["tox_prediction*"]
